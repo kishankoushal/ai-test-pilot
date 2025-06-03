@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+slack_sdk
+openai
+langchain
+langgraph
+python-dotenv
+jira
+aiohttp
