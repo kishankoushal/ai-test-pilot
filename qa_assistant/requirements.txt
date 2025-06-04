@@ -12,3 +12,13 @@ python-multipart
 streamlit
 beautifulsoup4
 langchain_openai
+dotenv
+bs4
+requests
+langchain-community
+chromadb
+tiktoken
+langchain-openai
+langchain-chroma
+boto3 # Only when s3 is in use
+s3fs # Only when s3 is in use
