@@ -7,3 +7,5 @@ langgraph
 python-dotenv
 jira
 aiohttp
+python-multipart
+streamlit
