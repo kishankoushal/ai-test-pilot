@@ -21,7 +21,6 @@ async def receive_log(payload: GHAFailurePayload):
         
         # Get confidence score for the summary
         score = get_confidence_score(summary)
-        score = 0.9
         # Send notification to Slack with complete information
         await notify_slack(summary, score, payload)
         
