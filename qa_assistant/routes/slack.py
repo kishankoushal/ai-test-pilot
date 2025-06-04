@@ -1,4 +1,5 @@
 import json
+import logging
 from fastapi import APIRouter, Request, HTTPException
 from services.jira_client import create_jira_bug
 from utils.config import SLACK_BOT_TOKEN
@@ -12,6 +13,7 @@ slack_client = AsyncWebClient(token=SLACK_BOT_TOKEN)
 async def slack_interact(request: Request):
     form_data = await request.form()
     payload = json.loads(form_data.get("payload", "{}"))
+    # logging.info(f"Received payload: {payload}")
     
     if payload.get("type") == "block_actions":
         # Handle button click to open modal
@@ -41,7 +43,7 @@ async def slack_interact(request: Request):
                                 "element": {
                                     "type": "plain_text_input",
                                     "action_id": "title",
-                                    "initial_value": f"Automation Failure - {bug_data.get('job_name')}"
+                                    "initial_value": bug_data.get('summary', f"Issue in {bug_data.get('job_name', '')}")
                                 }
                             },
                             {
@@ -52,28 +54,52 @@ async def slack_interact(request: Request):
                                     "type": "plain_text_input",
                                     "action_id": "description",
                                     "multiline": True,
-                                    "initial_value": bug_data.get("description", "")
+                                    "initial_value": bug_data.get('description', '')
                                 }
                             },
                             {
                                 "type": "input",
                                 "block_id": "assignee_block",
-                                "optional": True,
                                 "label": {"type": "plain_text", "text": "Assignee"},
                                 "element": {
-                                    "type": "plain_text_input",
-                                    "action_id": "assignee"
+                                    "type": "static_select",
+                                    "action_id": "assignee",
+                                    "placeholder": {"type": "plain_text", "text": "Select an assignee"},
+                                    "options": [
+                                        {
+                                            "text": {"type": "plain_text", "text": "Jatin Yadav"},
+                                            "value": "jatin.yadav@harness.io"
+                                        },
+                                        {
+                                            "text": {"type": "plain_text", "text": "Shreyansh Gupta"},
+                                            "value": "shreyansh.gupta@harness.io"
+                                        },
+                                        {
+                                            "text": {"type": "plain_text", "text": "Kishan Koushal"},
+                                            "value": "kishan.rongali@harness.io"
+                                        },
+                                        {
+                                            "text": {"type": "plain_text", "text": "Lajith Puthuchery"},
+                                            "value": "lajith.puthuchery@harness.io"
+                                        }
+                                    ]
                                 }
                             },
                             {
                                 "type": "input",
-                                "block_id": "labels_block",
-                                "optional": True,
-                                "label": {"type": "plain_text", "text": "Labels (comma separated)"},
+                                "block_id": "team_category_block",
+                                "label": {"type": "plain_text", "text": "Team Category"},
                                 "element": {
-                                    "type": "plain_text_input",
-                                    "action_id": "labels",
-                                    "initial_value": "automation,bug"
+                                    "type": "static_select",
+                                    "action_id": "team_category",
+                                    "placeholder": {"type": "plain_text", "text": "Select a team category"},
+                                    "options": [
+                                        {"text": {"type": "plain_text", "text": "Catalog"}, "value": "Catalog"},
+                                        {"text": {"type": "plain_text", "text": "Platform"}, "value": "Platform"},
+                                        {"text": {"type": "plain_text", "text": "UI"}, "value": "UI"},
+                                        {"text": {"type": "plain_text", "text": "Protection"}, "value": "Protection"},
+                                        {"text": {"type": "plain_text", "text": "Engineering Productivity"}, "value": "Engineering Productivity"}
+                                    ]
                                 }
                             }
                         ]
@@ -86,7 +112,7 @@ async def slack_interact(request: Request):
     elif payload.get("type") == "view_submission":
         # Handle form submission
         view = payload.get("view", {})
-        
+        logging.info(f"View submission: {view}")
         # Get submitted values
         values = view.get("state", {}).get("values", {})
         metadata = json.loads(view.get("private_metadata", "{}"))
@@ -94,7 +120,7 @@ async def slack_interact(request: Request):
         title = values.get("title_block", {}).get("title", {}).get("value", "Untitled Bug")
         description = values.get("description_block", {}).get("description", {}).get("value", "")
         assignee = values.get("assignee_block", {}).get("assignee", {}).get("value", "")
-        labels = values.get("labels_block", {}).get("labels", {}).get("value", "")
+        team_category = values.get("team_category_block", {}).get("team_category", {}).get("selected_option", {}).get("value", "")
         
         # Add commit info to description
         full_description = f"{description}\n\nCommit: {metadata.get('commit_sha', 'N/A')}"
@@ -104,7 +130,7 @@ async def slack_interact(request: Request):
             summary=title,
             description=full_description,
             assignee=assignee,
-            labels=labels.split(',') if labels else []
+            team_category=team_category
         )
         
         # Post a message in the channel about the new bug

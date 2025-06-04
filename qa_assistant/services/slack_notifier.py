@@ -20,8 +20,17 @@ def clean_markdown_for_slack(text):
     Clean markdown formatting to be compatible with Slack's mrkdwn format.
     Slack has its own markdown-like syntax but with differences.
     """
-    # Replace ** bold with * for Slack's single asterisk bold
-    text = re.sub(r'\*\*([^*]+)\*\*', r'*\1*', text)
+    if not text:
+        return ""
+        
+    # Remove ** bold markers completely for plain text
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    
+    # Remove any remaining ** markers
+    text = text.replace('**', '')
+    
+    # Fix escaped newlines
+    text = text.replace('\\n', '\n')
     
     # Ensure lists have a space after the bullet
     text = re.sub(r'^-([^\s])', r'- \1', text, flags=re.MULTILINE)
@@ -30,6 +39,43 @@ def clean_markdown_for_slack(text):
     text = re.sub(r'^(#+)([^\s])', r'\1 \2', text, flags=re.MULTILINE)
     
     return text
+
+def create_summary_title(text, max_length=60):
+    """
+    Creates a concise, meaningful title from the summary text.
+    Extracts the main issue or first important point.
+    """
+    if not text:
+        return "Bug Report"
+        
+    # Remove markdown formatting
+    clean_text = clean_markdown_for_slack(text)
+    
+    # Look for specific sections that indicate the main issue
+    main_issue_match = re.search(r'Main Issue:?\s*(.+?)(?:\n|$)', clean_text, re.IGNORECASE)
+    if main_issue_match:
+        title = main_issue_match.group(1).strip()
+    else:
+        # Try to find error messages
+        error_match = re.search(r'Error:?\s*(.+?)(?:\n|$)', clean_text, re.IGNORECASE)
+        if error_match:
+            title = error_match.group(1).strip()
+        else:
+            # Use first non-empty line that's not a heading
+            lines = clean_text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith(('#', '-', '*')) and len(line) > 5:
+                    title = line
+                    break
+            else:
+                title = "Bug Report"  # Fallback
+    
+    # Truncate if necessary
+    if len(title) > max_length:
+        title = title[:max_length-3] + "..."
+        
+    return title
 
 async def notify_slack(summary: str, score: float, payload):
     """
@@ -65,8 +111,14 @@ async def notify_slack(summary: str, score: float, payload):
     
     # Create a minimal payload with just essential information for the button value
     # We'll store just enough context to identify what we're filing a bug for
+    
+    # Create a clean version of the summary for the description and title
+    clean_summary = clean_markdown_for_slack(summary)
+    concise_title = create_summary_title(summary)
+    
     action_value = json.dumps({
-        "summary": summary[:75],  # Very short summary for button
+        "summary": concise_title,  # Use the concise title
+        "description": clean_summary,  # Use cleaned markdown
         "job_name": payload.job_name,
         "commit_sha": payload.commit_sha[:8] if payload.commit_sha else "unknown"
     })
@@ -76,6 +128,8 @@ async def notify_slack(summary: str, score: float, payload):
         logger.warning(f"Button value exceeds limit ({len(action_value)} chars), truncating further")
         # Create an even more minimal payload if needed
         action_value = json.dumps({
+            "summary": concise_title[:75],  # Truncate title
+            "description": clean_summary[:MAX_BUTTON_VALUE_LENGTH - 200],  # Add truncated description
             "job": payload.job_name[:50],
             "sha": payload.commit_sha[:8] if payload.commit_sha else "unknown" 
         })

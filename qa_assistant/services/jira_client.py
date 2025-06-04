@@ -19,7 +19,7 @@ def create_jira_bug(
     summary: str, 
     description: str = None, 
     assignee: Optional[str] = None, 
-    labels: List[str] = None
+    team_category: str = None
 ) -> str:
     """
     Create a Jira bug with the provided information.
@@ -40,11 +40,12 @@ def create_jira_bug(
     # Prepare issue fields
     issue_dict = {
         "project": "ENGTAI",
-        "summary": summary[:255],  # Jira has a limit on summary length
+        "summary": summary[:255],
         "description": description,
         "issuetype": {"name": "Bug"},
-        # Add required custom fields
-        "customfield_12544": {"value": "Catalog"}  # Product Area - TAI field
+        "customfield_12544": {"value": team_category},
+        "labels": ["BUG_BY_MATS"],
+        "components": [{"name": "E2E Test Automation"}]
     }
     
     logger.info(f"Creating Jira issue in project ENGTAI with summary: {summary[:50]}...")
@@ -56,10 +57,6 @@ def create_jira_bug(
         
         # Create the issue
         issue = jira.create_issue(**issue_dict)
-        
-        # Add labels if provided
-        if labels:
-            issue.update(fields={"labels": labels})
         
         issue_url = f"{JIRA_URL}/browse/{issue.key}"
         logger.info(f"Successfully created issue: {issue_url}")
