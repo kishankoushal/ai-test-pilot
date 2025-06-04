@@ -100,10 +100,27 @@ async def notify_slack(summary: str, score: float, payload):
     # Clean the summary for Slack's markdown format
     slack_formatted_summary = clean_markdown_for_slack(truncated_summary)
     
+    # Replace dash bullet points with proper bullet points and emoji indicators
+    slack_formatted_summary = re.sub(r'(?m)^- ', '• ', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?m)^  - ', '  ◦ ', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?m)^   - ', '   ▪️ ', slack_formatted_summary)
+    
+    # Add emojis to section headings
+    slack_formatted_summary = re.sub(r'(?i)Failure Summary:', '📊 *Failure Summary:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Summary of Failure Log:', '📝 *Summary of Failure Log:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Tests Run:', '🔄 *Tests Run:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Tests Passed:', '✅ *Tests Passed:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Failed/Interrupted:', '❌ *Failed/Interrupted:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Details:', '🔍 *Details:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Failures/Issues:', '⚠️ *Failures/Issues:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Other Notes:', '📌 *Other Notes:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Summary Statement:', '📢 *Summary Statement:*', slack_formatted_summary)
+    slack_formatted_summary = re.sub(r'(?i)Confidence Score:', '🎯 *Confidence Score:*', slack_formatted_summary)
+    
     # Create a header with timestamp and job information
     header = f"*🚨 Test Failure Report* | {current_time}\n"
-    header += f"*Job:* {payload.job_name}\n"
-    header += f"*Commit:* `{payload.commit_sha[:8] if payload.commit_sha else 'unknown'}`\n"
+    header += f"*🔧 Job:* {payload.job_name}\n"
+    header += f"*📎 Commit:* `{payload.commit_sha[:8] if payload.commit_sha else 'unknown'}`\n"
     header += divider
     
     # Full message with header and dividers
@@ -117,28 +134,30 @@ async def notify_slack(summary: str, score: float, payload):
     concise_title = create_summary_title(summary)
     
     action_value = json.dumps({
-        "summary": concise_title,  # Use the concise title
-        "description": clean_summary,  # Use cleaned markdown
-        "job_name": payload.job_name,
-        "commit_sha": payload.commit_sha[:8] if payload.commit_sha else "unknown"
+        "summary": concise_title[:75],  # Truncate title
+        "description": clean_summary[:MAX_BUTTON_VALUE_LENGTH - 200],  # Add truncated description
+        "job_name": payload.job_name[:50],  # Truncate job name
+        "commit_sha": payload.commit_sha[:8] if payload.commit_sha else "unknown"  # Truncate commit SHA
     })
-    
-    # Ensure button value is within limits
-    if len(action_value) > MAX_BUTTON_VALUE_LENGTH:
-        logger.warning(f"Button value exceeds limit ({len(action_value)} chars), truncating further")
-        # Create an even more minimal payload if needed
-        action_value = json.dumps({
-            "summary": concise_title[:75],  # Truncate title
-            "description": clean_summary[:MAX_BUTTON_VALUE_LENGTH - 200],  # Add truncated description
-            "job": payload.job_name[:50],
-            "sha": payload.commit_sha[:8] if payload.commit_sha else "unknown" 
-        })
     
     try:
         # Send the message to Slack
         response = await client.chat_postMessage(
             channel=SLACK_CHANNEL,
+            text=text,
             blocks=[
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"🆕 *New Report* | {current_time} | ID: `{int(time.time())}`"
+                        }
+                    ]
+                },
                 {
                     "type": "section", 
                     "text": {"type": "mrkdwn", "text": text}

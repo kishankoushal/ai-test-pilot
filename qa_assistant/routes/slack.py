@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Request, HTTPException
 from services.jira_client import create_jira_bug
 from utils.config import SLACK_BOT_TOKEN
-
+import asyncio
 from slack_sdk.web.async_client import AsyncWebClient
 
 router = APIRouter()
@@ -98,7 +98,7 @@ async def slack_interact(request: Request):
                                         {"text": {"type": "plain_text", "text": "Platform"}, "value": "Platform"},
                                         {"text": {"type": "plain_text", "text": "UI"}, "value": "UI"},
                                         {"text": {"type": "plain_text", "text": "Protection"}, "value": "Protection"},
-                                        {"text": {"type": "plain_text", "text": "Engineering Productivity"}, "value": "Engineering Productivity"}
+                                        {"text": {"type": "plain_text", "text": "Others"}, "value": "Others"}
                                     ]
                                 }
                             }
@@ -112,33 +112,57 @@ async def slack_interact(request: Request):
     elif payload.get("type") == "view_submission":
         # Handle form submission
         view = payload.get("view", {})
-        logging.info(f"View submission: {view}")
+        # logging.info(f"View submission: {view}")
         # Get submitted values
         values = view.get("state", {}).get("values", {})
         metadata = json.loads(view.get("private_metadata", "{}"))
         
         title = values.get("title_block", {}).get("title", {}).get("value", "Untitled Bug")
         description = values.get("description_block", {}).get("description", {}).get("value", "")
-        assignee = values.get("assignee_block", {}).get("assignee", {}).get("value", "")
+        assignee = values.get("assignee_block", {}).get("assignee", {}).get("selected_option", {}).get("value", "")
         team_category = values.get("team_category_block", {}).get("team_category", {}).get("selected_option", {}).get("value", "")
         
         # Add commit info to description
         full_description = f"{description}\n\nCommit: {metadata.get('commit_sha', 'N/A')}"
         
-        # Create the bug
+        # Get the user ID for notifications
+        user_id = payload.get("user", {}).get("id")
+        
+        # Create the Jira ticket asynchronously to avoid Slack timeout
+        asyncio.create_task(create_and_notify(
+            title=title, 
+            description=full_description,
+            assignee=assignee,
+            team_category=team_category,
+            user_id=user_id
+        ))
+        
+        # Return immediately to prevent Slack timeout
+        return {"response_action": "clear"}
+
+
+
+# Add this new async function near the other async functions
+async def create_and_notify(title, description, assignee, team_category, user_id):
+    """Create Jira ticket and notify user in background"""
+    try:
         ticket_url = create_jira_bug(
             summary=title,
-            description=full_description,
+            description=description,
             assignee=assignee,
             team_category=team_category
         )
         
-        # Post a message in the channel about the new bug
+        # Notify user of success
         await slack_client.chat_postMessage(
-            channel=payload.get("user", {}).get("id"),
+            channel=user_id,
             text=f"✅ Bug created successfully: {ticket_url}"
         )
-        
-        return {}  # Must return empty dict for view_submission
-        
-    return {"text": "Unknown interaction"}
+    except Exception as e:
+        # Log the error
+        logging.error(f"Error creating Jira ticket: {str(e)}")
+        # Notify user of error
+        await slack_client.chat_postMessage(
+            channel=user_id,
+            text=f"❌ Error creating bug: {str(e)}"
+        )

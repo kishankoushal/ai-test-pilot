@@ -18,7 +18,7 @@ except Exception as e:
 def create_jira_bug(
     summary: str, 
     description: str = None, 
-    assignee: Optional[str] = None, 
+    assignee: str = None, 
     team_category: str = None
 ) -> str:
     """
@@ -45,16 +45,22 @@ def create_jira_bug(
         "issuetype": {"name": "Bug"},
         "customfield_12544": {"value": team_category},
         "labels": ["BUG_BY_MATS"],
-        "components": [{"name": "E2E Test Automation"}]
+        "components": [{"name": "E2E Test Automation"}],
+        "priority": {"name": "P0"}
     }
     
     logger.info(f"Creating Jira issue in project ENGTAI with summary: {summary[:50]}...")
     
     try:
-        # Add assignee if provided
         if assignee:
-            issue_dict["assignee"] = {"name": assignee}
+            # For Jira Cloud, use accountId
+            user_id = get_jira_account_id(assignee)
+            if user_id:
+                issue_dict["assignee"] = {"accountId": user_id}
+            else:
+                logger.warning(f"Could not find accountId for {assignee}, leaving ticket unassigned")
         
+        # logger.info(f"Issue dictionary: {issue_dict}")
         # Create the issue
         issue = jira.create_issue(**issue_dict)
         
@@ -79,3 +85,17 @@ def create_jira_bug(
                 logger.error(f"Failed to get field info: {str(field_error)}")
         
         raise
+
+def get_jira_account_id(email):
+    """Convert email to Jira account ID"""
+    try:
+        # Look up the user by email
+        users = jira.search_users(query=email)
+        if users:
+            # Return the first matching user's accountId
+            return users[0].accountId
+        logger.warning(f"No Jira user found with email: {email}")
+        return None
+    except Exception as e:
+        logger.error(f"Error finding Jira user by email: {e}")
+        return None

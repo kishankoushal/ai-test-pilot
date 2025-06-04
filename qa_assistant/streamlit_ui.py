@@ -22,7 +22,8 @@ except Exception as e:
 # Input: Confluence Page ID
 page_id = st.text_input("Enter Confluence Page ID")
 
-ngrok_base_url = "https://9517-2409-40c2-301d-d786-9dab-e442-c408-23aa.ngrok-free.app"
+# ngrok_base_url = "https://9517-2409-40c2-301d-d786-9dab-e442-c408-23aa.ngrok-free.app"
+ngrok_base_url = os.environ.get("BACKEND_URL", "http://localhost:8080")
 
 # Create tabs for different sections
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Results", "🔄 Processing Steps", "📈 LangSmith Metrics", "🔗 LangSmith Traces"])

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qa-frontend
+  labels:
+    app: qa-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qa-frontend
+  template:
+    metadata:
+      labels:
+        app: qa-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: jatinyadav02022003/ai-test-pilot-frontend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8501
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: BACKEND_URL
+          value: "http://qa-backend-service:8080"
+        resources:
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+        volumeMounts:
+        - name: env-config
+          mountPath: /app/.env
+          subPath: .env
+      volumes:
+      - name: env-config
+        configMap:
+          name: qa-env-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qa-frontend-service
+spec:
+  selector:
+    app: qa-frontend
+  ports:
+  - port: 8501
+    targetPort: 8501
+  type: LoadBalancer
