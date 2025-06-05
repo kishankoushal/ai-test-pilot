@@ -10,14 +10,15 @@ def generate_test_plan(features):
     # Using LangChain components for automatic LangSmith tracing
     llm = ChatOpenAI(
         model="gpt-4.1", 
+        max_tokens=40,
         openai_api_key=OPENAI_API_KEY,
         tags=["qa_assistant", "test_plan_generation"]
     )
     
     prompt = ChatPromptTemplate.from_template(
-        "Generate a QA test plan for this feature:\n{feature}"
+        "Generate a simple, brief test plan for this feature. Don't use any formatting like markdown, asterisks, headers, or section titles. Use plain text only:\n{feature}"
     )
-    
+    #  "Generate a QA test plan for this feature:\n{feature}"
     # Define the chain with proper config for LangSmith
     chain = (
         {"feature": RunnablePassthrough()} 

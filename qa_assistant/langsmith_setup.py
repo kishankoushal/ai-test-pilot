@@ -22,7 +22,7 @@ client = get_langsmith_client()
 
 def get_project_name():
     """Get the project name from environment or use default."""
-    return os.getenv("LANGCHAIN_PROJECT", "qa_assistant")
+    return os.getenv("LANGCHAIN_PROJECT", "test-pilot-ai")
 
 def is_tracing_enabled():
     """Check if LangSmith tracing is enabled."""

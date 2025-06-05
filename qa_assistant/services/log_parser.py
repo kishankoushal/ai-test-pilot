@@ -8,6 +8,7 @@ def summarize_log(log: str) -> str:
     # Using LangChain components for automatic LangSmith tracing
     llm = ChatOpenAI(
         model="gpt-4.1", 
+        max_tokens=25,
         openai_api_key=OPENAI_API_KEY,
         tags=["qa_assistant"]
     )

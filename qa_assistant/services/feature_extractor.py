@@ -11,12 +11,13 @@ def extract_features(chunks):
     llm = ChatOpenAI(
         model="gpt-4.1", 
         temperature=0,
+        max_tokens=30,
         openai_api_key=OPENAI_API_KEY,
         tags=["qa_assistant", "feature_extraction"]
     )
     
     prompt = PromptTemplate.from_template(
-        "Extract features or testable flows from this PRD:\n\n{doc_chunk}"
+        "Extract key features or testable flows from this PRD. Format each feature as a brief title without any markdown formatting (no asterisks or special characters). Focus on the main functionality:\n\n{doc_chunk}"
     )
     
     # Define the chain with proper config for LangSmith
@@ -31,6 +32,10 @@ def extract_features(chunks):
     
     for chunk in chunks:
         response = chain.invoke(chunk)
-        features.append(response.content.strip())
+        # Process the response to get clean feature titles
+        content = response.content.strip()
+        # Split by lines and clean up each feature
+        feature_lines = [line.strip() for line in content.split('\n') if line.strip()]
+        features.extend(feature_lines)
     
     return features
