@@ -4,3 +4,4 @@ venv/
 bin/
 lib/
 share/
+etc
